@@ -6,20 +6,26 @@ import com.ms2pedidos.backend_pedidos.dto.request.PedidoRequestDTO;
 import com.ms2pedidos.backend_pedidos.dto.response.DetalleResponseDTO;
 import com.ms2pedidos.backend_pedidos.dto.response.PedidoResponseDTO;
 import com.ms2pedidos.backend_pedidos.exception.ResourceNotFoundException;
+import com.ms2pedidos.backend_pedidos.exception.StockInsufficientException;
 import com.ms2pedidos.backend_pedidos.DetallePedido.model.DetallePedido;
 import com.ms2pedidos.backend_pedidos.Pedido.model.Pedido;
 import com.ms2pedidos.backend_pedidos.Pedido.model.Pedido.EstadoPedido;
 import com.ms2pedidos.backend_pedidos.Pedido.reposiroty.PedidoRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PedidoService {
@@ -52,49 +58,91 @@ public class PedidoService {
     // Crear pedido — valida productos en MS1
     @Transactional
     public PedidoResponseDTO crear(PedidoRequestDTO req) {
-        Pedido pedido = Pedido.builder()
-            .usuarioId(req.getUsuarioId())
-            .estado(EstadoPedido.PENDIENTE)
-            .build();
+        Map<Long, Integer> cantidadesPorProducto = req.getItems().stream()
+            .collect(Collectors.groupingBy(
+                PedidoRequestDTO.ItemDTO::getProductoId,
+                Collectors.summingInt(PedidoRequestDTO.ItemDTO::getCantidad)
+            ));
 
-        List<DetallePedido> detalles = req.getItems().stream().map(item -> {
-            ProductoDTO producto = productoClient.getProducto(item.getProductoId())
-                .orElseThrow(() -> new ResourceNotFoundException(
-                    "Producto no encontrado en MS1: " + item.getProductoId()
-                ));
-            return DetallePedido.builder()
-                .pedido(pedido)
-                .productoId(item.getProductoId())
-                .cantidad(item.getCantidad())
-                .precioUnitario(producto.getPrecio())
+        Map<Long, ProductoDTO> productos = new HashMap<>();
+        Map<Long, Integer> stockOriginal = new HashMap<>();
+        List<Long> productosActualizados = new ArrayList<>();
+
+        try {
+            cantidadesPorProducto.forEach((productoId, cantidadSolicitada) -> {
+                ProductoDTO producto = productoClient.getProducto(productoId)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                        "Producto no encontrado en MS1: " + productoId
+                    ));
+
+                Integer stockDisponible = producto.getStock();
+                if (stockDisponible == null || stockDisponible < cantidadSolicitada) {
+                    throw new StockInsufficientException(
+                        "Stock insuficiente para el producto " + productoId +
+                        ": disponible " + stockDisponible + ", solicitado " + cantidadSolicitada
+                    );
+                }
+
+                productos.put(productoId, producto);
+                stockOriginal.put(productoId, stockDisponible);
+            });
+
+            cantidadesPorProducto.forEach((productoId, cantidadSolicitada) -> {
+                ProductoDTO producto = productos.get(productoId);
+                int nuevoStock = producto.getStock() - cantidadSolicitada;
+
+                productoClient.actualizarStock(productoId, nuevoStock)
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                        "Producto no encontrado en MS1: " + productoId
+                    ));
+
+                productosActualizados.add(productoId);
+            });
+
+            Pedido pedido = Pedido.builder()
+                .usuarioId(req.getUsuarioId())
+                .estado(EstadoPedido.PENDIENTE)
                 .build();
-        }).toList();
 
-        BigDecimal total = detalles.stream()
-            .map(d -> d.getPrecioUnitario().multiply(BigDecimal.valueOf(d.getCantidad())))
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+            List<DetallePedido> detalles = req.getItems().stream().map(item -> {
+                ProductoDTO producto = productos.get(item.getProductoId());
+                return DetallePedido.builder()
+                    .pedido(pedido)
+                    .productoId(item.getProductoId())
+                    .cantidad(item.getCantidad())
+                    .precioUnitario(producto.getPrecio())
+                    .build();
+            }).toList();
 
-        pedido.setTotal(total);
-        pedido.setDetalle(detalles);
-        
-        Pedido guardado = pedidoRepo.save(pedido);
-        
-        // Simular actualización asíncrona académica
-        java.util.concurrent.CompletableFuture.runAsync(() -> {
-            try {
-                // Pasa a ENVIADO a los 15 segundos
-                Thread.sleep(15000);
-                actualizarEstado(guardado.getId(), EstadoPedido.ENVIADO);
-                
-                // Pasa a ENTREGADO a los 15 segundos adicionales
-                Thread.sleep(15000);
-                actualizarEstado(guardado.getId(), EstadoPedido.ENTREGADO);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            }
-        });
+            BigDecimal total = detalles.stream()
+                .map(d -> d.getPrecioUnitario().multiply(BigDecimal.valueOf(d.getCantidad())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return toDTO(guardado);
+            pedido.setTotal(total);
+            pedido.setDetalle(detalles);
+
+            Pedido guardado = pedidoRepo.save(pedido);
+
+            // Simular actualización asíncrona académica
+            java.util.concurrent.CompletableFuture.runAsync(() -> {
+                try {
+                    // Pasa a ENVIADO a los 15 segundos
+                    Thread.sleep(15000);
+                    actualizarEstado(guardado.getId(), EstadoPedido.ENVIADO);
+
+                    // Pasa a ENTREGADO a los 15 segundos adicionales
+                    Thread.sleep(15000);
+                    actualizarEstado(guardado.getId(), EstadoPedido.ENTREGADO);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+
+            return toDTO(guardado);
+        } catch (RuntimeException ex) {
+            restaurarStock(productosActualizados, stockOriginal);
+            throw ex;
+        }
     }
 
     // Actualizar estado
@@ -140,5 +188,22 @@ public class PedidoService {
             }).toList());
         }
         return dto;
+    }
+
+    private void restaurarStock(List<Long> productosActualizados, Map<Long, Integer> stockOriginal) {
+        for (int i = productosActualizados.size() - 1; i >= 0; i--) {
+            Long productoId = productosActualizados.get(i);
+            Integer stock = stockOriginal.get(productoId);
+
+            if (stock == null) {
+                continue;
+            }
+
+            try {
+                productoClient.actualizarStock(productoId, stock);
+            } catch (RuntimeException e) {
+                log.error("No se pudo restaurar el stock del producto {}: {}", productoId, e.getMessage());
+            }
+        }
     }
 }
