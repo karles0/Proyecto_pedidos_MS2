@@ -1,0 +1,127 @@
+{
+	"info": {
+		"name": "Backend Pedidos MS2",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Listar Todos (Admin)",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/pedidos?page=1&limit=20",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"pedidos"
+					],
+					"query": [
+						{
+							"key": "page",
+							"value": "1"
+						},
+						{
+							"key": "limit",
+							"value": "20"
+						}
+					]
+				}
+			}
+		},
+		{
+			"name": "Crear Pedido",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"usuarioId\": \"user-20k\",\n  \"items\": [\n    {\n      \"productoId\": 1,\n      \"cantidad\": 2\n    }\n  ]\n}"
+				},
+				"url": {
+					"raw": "{{base_url}}/pedidos",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"pedidos"
+					]
+				}
+			}
+		},
+		{
+			"name": "Mis Pedidos",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/pedidos/mis-pedidos",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"pedidos",
+						"mis-pedidos"
+					]
+				}
+			}
+		},
+		{
+			"name": "Obtener Pedido por ID",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_token}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "{{base_url}}/pedidos/1",
+					"host": [
+						"{{base_url}}"
+					],
+					"path": [
+						"pedidos",
+                        "1"
+					]
+				}
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "base_url",
+			"value": "http://localhost:8002"
+		},
+		{
+			"key": "jwt_token",
+			"value": "pon_aqui_el_token_generado"
+		}
+	]
+}

@@ -1,0 +1,233 @@
+components:
+  schemas:
+    DetalleResponseDTO:
+      properties:
+        cantidad:
+          format: int32
+          type: integer
+        precioUnitario:
+          type: number
+        productoId:
+          format: int64
+          type: integer
+        subtotal:
+          type: number
+      type: object
+    ItemDTO:
+      properties:
+        cantidad:
+          format: int32
+          type: integer
+        productoId:
+          format: int64
+          type: integer
+      required:
+      - cantidad
+      - productoId
+      type: object
+    PedidoRequestDTO:
+      properties:
+        items:
+          items:
+            $ref: '#/components/schemas/ItemDTO'
+          minItems: 1
+          type: array
+        usuarioId:
+          minLength: 1
+          type: string
+      type: object
+    PedidoResponseDTO:
+      properties:
+        creadoEn:
+          format: date-time
+          type: string
+        detalle:
+          items:
+            $ref: '#/components/schemas/DetalleResponseDTO'
+          type: array
+        estado:
+          enum:
+          - PENDIENTE
+          - ENVIADO
+          - ENTREGADO
+          type: string
+        id:
+          format: int64
+          type: integer
+        total:
+          type: number
+        usuarioId:
+          type: string
+      type: object
+info:
+  title: OpenAPI definition
+  version: v0
+openapi: 3.1.0
+paths:
+  /pedidos:
+    get:
+      operationId: listarTodos
+      parameters:
+      - in: query
+        name: page
+        required: false
+        schema:
+          default: 1
+          format: int32
+          type: integer
+      - in: query
+        name: limit
+        required: false
+        schema:
+          default: 20
+          format: int32
+          type: integer
+      responses:
+        '200':
+          content:
+            '*/*':
+              schema:
+                additionalProperties:
+                  type: object
+                type: object
+          description: OK
+      security:
+      - bearerAuth: []
+      summary: Listar todos los pedidos (paginado)
+      tags:
+      - Pedidos
+    post:
+      operationId: crear
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PedidoRequestDTO'
+        required: true
+      responses:
+        '200':
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PedidoResponseDTO'
+          description: OK
+      security:
+      - bearerAuth: []
+      summary: Crear nuevo pedido (valida productos en MS1)
+      tags:
+      - Pedidos
+  /pedidos/mis-pedidos:
+    get:
+      operationId: misPedidos
+      responses:
+        '200':
+          content:
+            '*/*':
+              schema:
+                items:
+                  $ref: '#/components/schemas/PedidoResponseDTO'
+                type: array
+          description: OK
+      security:
+      - bearerAuth: []
+      summary: Listar mis propios pedidos (usa el token)
+      tags:
+      - Pedidos
+  /pedidos/usuario/{usuarioId}:
+    get:
+      operationId: listarPorUsuario
+      parameters:
+      - in: path
+        name: usuarioId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          content:
+            '*/*':
+              schema:
+                items:
+                  $ref: '#/components/schemas/PedidoResponseDTO'
+                type: array
+          description: OK
+      security:
+      - bearerAuth: []
+      summary: Listar pedidos de un usuario
+      tags:
+      - Pedidos
+  /pedidos/{id}:
+    delete:
+      operationId: eliminar
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: int64
+          type: integer
+      responses:
+        '200':
+          description: OK
+      security:
+      - bearerAuth: []
+      summary: Eliminar pedido
+      tags:
+      - Pedidos
+    get:
+      operationId: obtener
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: int64
+          type: integer
+      responses:
+        '200':
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PedidoResponseDTO'
+          description: OK
+      security:
+      - bearerAuth: []
+      summary: Obtener pedido por ID
+      tags:
+      - Pedidos
+  /pedidos/{id}/estado:
+    put:
+      operationId: actualizarEstado
+      parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          format: int64
+          type: integer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              additionalProperties:
+                type: string
+              type: object
+        required: true
+      responses:
+        '200':
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/PedidoResponseDTO'
+          description: OK
+      security:
+      - bearerAuth: []
+      summary: Actualizar estado del pedido
+      tags:
+      - Pedidos
+servers:
+- description: Generated server url
+  url: http://localhost:8002
+tags:
+- description: "Gesti\xF3n de pedidos"
+  name: Pedidos

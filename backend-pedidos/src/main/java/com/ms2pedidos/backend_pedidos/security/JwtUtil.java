@@ -1,12 +1,10 @@
 package com.ms2pedidos.backend_pedidos.security;
 
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;
+import com.auth0.jwt.JWT;
+import com.auth0.jwt.algorithms.Algorithm;
+import com.auth0.jwt.interfaces.DecodedJWT;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 
 @Component
 public class JwtUtil {
@@ -14,24 +12,20 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secret;
 
-    private SecretKey getKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
+    private Algorithm getAlgorithm() {
+        return Algorithm.HMAC256(secret);
     }
 
     public String extractUserId(String token) {
-        return Jwts.parser()
-            .verifyWith(getKey())
-            .build()
-            .parseSignedClaims(token)
-            .getPayload()
-            .get("id", String.class);
+        DecodedJWT jwt = JWT.require(getAlgorithm()).build().verify(token);
+        return jwt.getClaim("id").asString();
     }
 
     public boolean isValid(String token) {
         try {
-            Jwts.parser().verifyWith(getKey()).build().parseSignedClaims(token);
+            JWT.require(getAlgorithm()).build().verify(token);
             return true;
-        } catch (JwtException | IllegalArgumentException e) {
+        } catch (Exception e) {
             return false;
         }
     }

@@ -49,6 +49,7 @@ public class PedidoService {
     }
 
     // Crear pedido — valida productos en MS1
+    // Crear pedido — valida productos en MS1
     @Transactional
     public PedidoResponseDTO crear(PedidoRequestDTO req) {
         Pedido pedido = Pedido.builder()
@@ -75,7 +76,25 @@ public class PedidoService {
 
         pedido.setTotal(total);
         pedido.setDetalle(detalles);
-        return toDTO(pedidoRepo.save(pedido));
+        
+        Pedido guardado = pedidoRepo.save(pedido);
+        
+        // Simular actualización asíncrona académica
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                // Pasa a ENVIADO a los 15 segundos
+                Thread.sleep(15000);
+                actualizarEstado(guardado.getId(), EstadoPedido.ENVIADO);
+                
+                // Pasa a ENTREGADO a los 15 segundos adicionales
+                Thread.sleep(15000);
+                actualizarEstado(guardado.getId(), EstadoPedido.ENTREGADO);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+
+        return toDTO(guardado);
     }
 
     // Actualizar estado
