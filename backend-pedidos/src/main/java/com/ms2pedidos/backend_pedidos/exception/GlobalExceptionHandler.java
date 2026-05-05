@@ -18,6 +18,12 @@ public class GlobalExceptionHandler {
             .body(Map.of("status", "fail", "message", ex.getMessage()));
     }
 
+    @ExceptionHandler(StockInsufficientException.class)
+    public ResponseEntity<Map<String, String>> handleStockInsufficient(StockInsufficientException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(Map.of("status", "fail", "message", ex.getMessage()));
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidation(MethodArgumentNotValidException ex) {
         String errors = ex.getBindingResult().getFieldErrors().stream()
