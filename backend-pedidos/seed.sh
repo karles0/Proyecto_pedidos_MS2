@@ -21,6 +21,14 @@ set +a
 : "${DB_PASS:?Falta DB_PASS en .env}"
 
 docker run --rm \
+	-v "$SCRIPT_DIR:/work" \
+	-e PGPASSWORD="$DB_PASS" \
+	postgres:16-alpine \
+	psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" \
+	-v ON_ERROR_STOP=1 \
+	-f /work/seed.sql
+
+docker run --rm \
 	-e PGPASSWORD="$DB_PASS" \
 	postgres:16-alpine \
 	psql -h "$DB_HOST" -U "$DB_USER" -d "$DB_NAME" \
